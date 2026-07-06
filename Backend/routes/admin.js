@@ -53,7 +53,7 @@ router.get('/tasks', async (req, res) => {
     }
 });
 
-// ✅ Get tasks by specific user
+
 router.get('/tasks/user/:userId', async (req, res) => {
     try {
         const userId = parseInt(req.params.userId);
@@ -76,7 +76,7 @@ router.get('/tasks/user/:userId', async (req, res) => {
     }
 });
 
-// ✅ Assign task to user
+
 router.post('/assign-task', async (req, res) => {
     try {
         const { userId, taskName } = req.body;
@@ -88,7 +88,7 @@ router.post('/assign-task', async (req, res) => {
             });
         }
 
-        // Check if user exists
+       
         const [users] = await db.query(
             'SELECT id FROM users WHERE id = ?',
             [userId]
@@ -126,7 +126,7 @@ router.post('/assign-task', async (req, res) => {
     }
 });
 
-// ✅ Delete any task
+
 router.delete('/task/:id', async (req, res) => {
     try {
         const id = parseInt(req.params.id);
@@ -156,8 +156,44 @@ router.delete('/task/:id', async (req, res) => {
         });
     }
 });
+// ✅ Set In Progress
+router.patch('/task/:id/inprogress', async (req, res) => {
+    try {
+        const id = parseInt(req.params.id);
+        const { isInProgress } = req.body;
+        
+        const [result] = await db.query(
+            'UPDATE tasks SET isInProgress = ? WHERE id = ?',
+            [isInProgress, id]
+        );
+        
+        if (result.affectedRows === 0) {
+            return res.status(404).json({
+                success: false,
+                message: 'Task not found'
+            });
+        }
+        
+        const [updatedTask] = await db.query(
+            'SELECT * FROM tasks WHERE id = ?',
+            [id]
+        );
+        
+        res.json({
+            success: true,
+            data: updatedTask[0],
+            message: 'Task status updated'
+        });
+    } catch (error) {
+        console.error('Error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to update task',
+            error: error.message
+        });
+    }
+});
 
-// ✅ Toggle any task
 router.patch('/task/:id/toggle', async (req, res) => {
     try {
         const id = parseInt(req.params.id);

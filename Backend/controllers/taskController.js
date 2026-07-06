@@ -149,12 +149,50 @@ const toggleComplete = async (req, res) => {
             error: error.message
         });
     }
+    
 };
-
+const setInProgress = async (req, res) => {
+    try {
+        const id = parseInt(req.params.id);
+        const userId = req.userId;
+        const { isInProgress } = req.body;
+        
+        const [result] = await db.query(
+            'UPDATE tasks SET isInProgress = ? WHERE id = ? AND user_id = ?',
+            [isInProgress, id, userId]
+        );
+        
+        if (result.affectedRows === 0) {
+            return res.status(404).json({
+                success: false,
+                message: 'Task not found'
+            });
+        }
+        
+        const [updatedTask] = await db.query(
+            'SELECT * FROM tasks WHERE id = ?',
+            [id]
+        );
+        
+        res.json({
+            success: true,
+            data: updatedTask[0],
+            message: 'Task status updated'
+        });
+    } catch (error) {
+        console.error('Error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to update task',
+            error: error.message
+        });
+    }
+};
 module.exports = {
     getAllTasks,
     createTask,
     deleteTask,
     toggleComplete,
-    test  
+    test,
+    setInProgress
 };

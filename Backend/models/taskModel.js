@@ -70,6 +70,32 @@ class TaskModel {
         );
         return result.affectedRows;
     }
+    // Create task with isInProgress
+static async createTask(userId, taskName) {
+    const [result] = await db.query(
+        'INSERT INTO tasks (user_id, taskName, isInProgress) VALUES (?, ?, ?)',
+        [userId, taskName, false]
+    );
+    return result.insertId;
+}
+
+
+static async updateTask(id, userId, taskName, isCompleted, isInProgress) {
+    const [result] = await db.query(
+        'UPDATE tasks SET taskName = ?, isCompleted = ?, isInProgress = ? WHERE id = ? AND user_id = ?',
+        [taskName, isCompleted, isInProgress, id, userId]
+    );
+    return result.affectedRows;
+}
+
+
+static async toggleComplete(id, userId, isCompleted) {
+    const [result] = await db.query(
+        'UPDATE tasks SET isCompleted = ?, isInProgress = ? WHERE id = ? AND user_id = ?',
+        [isCompleted, false, id, userId]
+    );
+    return result.affectedRows;
+}
 }
 
 module.exports = TaskModel;

@@ -4,19 +4,18 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const db = require('../config/database');
 
-// ✅ TEST ROUTE INSIDE AUTH
+
 router.get('/test', (req, res) => {
-    console.log('🧪 Auth test route hit!');
+    console.log(' Auth test route hit!');
     res.json({ 
         success: true, 
         message: 'Auth route working!' 
     });
 });
 
-// ✅ REGISTER
 router.post('/register', async (req, res) => {
-    console.log('📦 Register request received');
-    console.log('📦 Body:', req.body);
+    console.log(' Register request received');
+    console.log(' Body:', req.body);
     
     try {
         const { email, password } = req.body;
@@ -35,7 +34,7 @@ router.post('/register', async (req, res) => {
             });
         }
 
-        // Check if user exists
+       
         const [existing] = await db.query(
             'SELECT * FROM users WHERE email = ?',
             [email]
@@ -48,29 +47,28 @@ router.post('/register', async (req, res) => {
             });
         }
 
-        // Hash password
+     
         const hashedPassword = await bcrypt.hash(password, 10);
 
-        // Save user (with default role 'user')
+   
         const [result] = await db.query(
             'INSERT INTO users (email, password, role) VALUES (?, ?, ?)',
             [email, hashedPassword, 'user']
         );
 
-        // Get user
         const [user] = await db.query(
             'SELECT id, email, role FROM users WHERE id = ?',
             [result.insertId]
         );
 
-        // Generate token with role
+      
         const token = jwt.sign(
             { userId: user[0].id, email: user[0].email, role: user[0].role || 'user' },
             process.env.JWT_SECRET,
             { expiresIn: '7d' }
         );
 
-        console.log('✅ User registered:', email);
+        console.log(' User registered:', email);
 
         res.status(201).json({
             success: true,
@@ -84,7 +82,7 @@ router.post('/register', async (req, res) => {
         });
 
     } catch (error) {
-        console.error('❌ Registration error:', error);
+        console.error(' Registration error:', error);
         res.status(500).json({
             success: false,
             message: 'Registration failed',
@@ -93,10 +91,10 @@ router.post('/register', async (req, res) => {
     }
 });
 
-// ✅ LOGIN
+
 router.post('/login', async (req, res) => {
-    console.log('📦 Login request received');
-    console.log('📦 Body:', req.body);
+    console.log(' Login request received');
+    console.log(' Body:', req.body);
     
     try {
         const { email, password } = req.body;
@@ -108,7 +106,7 @@ router.post('/login', async (req, res) => {
             });
         }
 
-        // Find user
+        
         const [users] = await db.query(
             'SELECT * FROM users WHERE email = ?',
             [email]
@@ -132,16 +130,16 @@ router.post('/login', async (req, res) => {
 //         message: 'Invalid email or password'
 //     });
 // }
-console.log('✅ Password check bypassed!');
+console.log(' Password check bypassed!');
 
-        // Generate token with role
+        
         const token = jwt.sign(
             { userId: user.id, email: user.email, role: user.role || 'user' },
             process.env.JWT_SECRET,
             { expiresIn: '7d' }
         );
 
-        console.log('✅ User logged in:', email);
+        console.log('User logged in:', email);
 
         res.json({
             success: true,
@@ -155,7 +153,7 @@ console.log('✅ Password check bypassed!');
         });
 
     } catch (error) {
-        console.error('❌ Login error:', error);
+        console.error(' Login error:', error);
         res.status(500).json({
             success: false,
             message: 'Login failed',
