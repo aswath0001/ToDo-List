@@ -44,7 +44,5 @@ app.use((err, req, res, next) => {
 
 app.listen(PORT, () => {
     console.log(` Server running on http://localhost:${PORT}`);
-    console.log(`Auth API: http://localhost:${PORT}/api/auth`);
-    console.log(`Tasks API: http://localhost:${PORT}/api/tasks`);
-    console.log(`Admin API: http://localhost:${PORT}/api/admin`); 
+   
 });

@@ -4,26 +4,17 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const db = require('../config/database');
 
-
-router.get('/test', (req, res) => {
-    console.log(' Auth test route hit!');
-    res.json({ 
-        success: true, 
-        message: 'Auth route working!' 
-    });
-});
-
 router.post('/register', async (req, res) => {
     console.log(' Register request received');
     console.log(' Body:', req.body);
     
     try {
-        const { email, password } = req.body;
+        const { name, email, password, jobRole } = req.body;
 
-        if (!email || !password) {
+        if (!name || !email || !password) {
             return res.status(400).json({
                 success: false,
-                message: 'Email and password are required'
+                message: 'Name, email and password are required'
             });
         }
 
@@ -34,7 +25,6 @@ router.post('/register', async (req, res) => {
             });
         }
 
-       
         const [existing] = await db.query(
             'SELECT * FROM users WHERE email = ?',
             [email]
@@ -47,21 +37,19 @@ router.post('/register', async (req, res) => {
             });
         }
 
-     
         const hashedPassword = await bcrypt.hash(password, 10);
 
-   
+        
         const [result] = await db.query(
-            'INSERT INTO users (email, password, role) VALUES (?, ?, ?)',
-            [email, hashedPassword, 'user']
+            'INSERT INTO users (name, email, password, role, jobRole) VALUES (?, ?, ?, ?, ?)',
+            [name, email, hashedPassword, 'user', jobRole || 'Developer']
         );
 
         const [user] = await db.query(
-            'SELECT id, email, role FROM users WHERE id = ?',
+            'SELECT id, name, email, role, jobRole FROM users WHERE id = ?',
             [result.insertId]
         );
 
-      
         const token = jwt.sign(
             { userId: user[0].id, email: user[0].email, role: user[0].role || 'user' },
             process.env.JWT_SECRET,
@@ -74,15 +62,17 @@ router.post('/register', async (req, res) => {
             success: true,
             data: {
                 id: user[0].id,
+                name: user[0].name,
                 email: user[0].email,
                 role: user[0].role || 'user',
+                jobRole: user[0].jobRole || 'Developer',
                 token: token
             },
             message: 'User registered successfully'
         });
 
     } catch (error) {
-        console.error(' Registration error:', error);
+        console.error('Registration error:', error);
         res.status(500).json({
             success: false,
             message: 'Registration failed',
@@ -106,7 +96,7 @@ router.post('/login', async (req, res) => {
             });
         }
 
-        
+    
         const [users] = await db.query(
             'SELECT * FROM users WHERE email = ?',
             [email]
@@ -121,18 +111,15 @@ router.post('/login', async (req, res) => {
 
         const user = users[0];
 
-        // Verify password
-       // ✅ TEMPORARY - Skip password check for testing
-// const isValid = await bcrypt.compare(password, user.password);
-// if (!isValid) {
-//     return res.status(401).json({
-//         success: false,
-//         message: 'Invalid email or password'
-//     });
-// }
-console.log(' Password check bypassed!');
+    
+        const isValid = await bcrypt.compare(password, user.password);
+        if (!isValid) {
+            return res.status(401).json({
+                success: false,
+                message: 'Invalid email or password'
+            });
+        }
 
-        
         const token = jwt.sign(
             { userId: user.id, email: user.email, role: user.role || 'user' },
             process.env.JWT_SECRET,
@@ -145,8 +132,10 @@ console.log(' Password check bypassed!');
             success: true,
             data: {
                 id: user.id,
+                name: user.name,
                 email: user.email,
                 role: user.role || 'user',
+                jobRole: user.jobRole || 'Developer',
                 token: token
             },
             message: 'Login successful'

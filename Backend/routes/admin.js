@@ -1,18 +1,17 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../config/database');
+const bcrypt = require('bcryptjs');
 const { authenticate } = require('../middleware/auth');
 const { isAdmin } = require('../middleware/admin');
-
 
 router.use(authenticate);
 router.use(isAdmin);
 
-
 router.get('/users', async (req, res) => {
     try {
         const [users] = await db.query(
-            'SELECT id, email, role, createdAt FROM users ORDER BY id ASC'
+            'SELECT id, name, email, role, jobRole, createdAt FROM users ORDER BY id DESC'
         );
         res.json({
             success: true,
@@ -30,47 +29,53 @@ router.get('/users', async (req, res) => {
 });
 
 
-router.get('/tasks', async (req, res) => {
+router.post('/users', async (req, res) => {
     try {
-        const [tasks] = await db.query(
-            `SELECT t.*, u.email as userEmail 
-             FROM tasks t 
-             JOIN users u ON t.user_id = u.id 
-             ORDER BY t.id ASC`
+        const { name, email, password, role, jobRole } = req.body;
+        
+        if (!name || !email || !password) {
+            return res.status(400).json({
+                success: false,
+                message: 'Name, email and password are required'
+            });
+        }
+
+        const [existing] = await db.query(
+            'SELECT id FROM users WHERE email = ?',
+            [email]
         );
-        res.json({
+
+        if (existing.length > 0) {
+            return res.status(400).json({
+                success: false,
+                message: 'User already exists'
+            });
+        }
+
+     
+        const hashedPassword = await bcrypt.hash(password, 10);
+        const userRole = role || 'user';
+
+        const [result] = await db.query(
+            'INSERT INTO users (name, email, password, role, jobRole) VALUES (?, ?, ?, ?, ?)',
+            [name, email, hashedPassword, userRole, jobRole || 'Developer']
+        );
+
+        const [newUser] = await db.query(
+            'SELECT id, name, email, role, jobRole FROM users WHERE id = ?',
+            [result.insertId]
+        );
+
+        res.status(201).json({
             success: true,
-            data: tasks,
-            count: tasks.length
+            data: newUser[0],
+            message: 'User added successfully'
         });
     } catch (error) {
-        console.error('Error fetching all tasks:', error);
+        console.error('Error adding user:', error);
         res.status(500).json({
             success: false,
-            message: 'Failed to fetch tasks',
-            error: error.message
-        });
-    }
-});
-
-
-router.get('/tasks/user/:userId', async (req, res) => {
-    try {
-        const userId = parseInt(req.params.userId);
-        const [tasks] = await db.query(
-            'SELECT * FROM tasks WHERE user_id = ? ORDER BY id DESC',
-            [userId]
-        );
-        res.json({
-            success: true,
-            data: tasks,
-            count: tasks.length
-        });
-    } catch (error) {
-        console.error('Error fetching user tasks:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Failed to fetch user tasks',
+            message: 'Failed to add user',
             error: error.message
         });
     }
@@ -88,7 +93,6 @@ router.post('/assign-task', async (req, res) => {
             });
         }
 
-       
         const [users] = await db.query(
             'SELECT id FROM users WHERE id = ?',
             [userId]
@@ -102,8 +106,8 @@ router.post('/assign-task', async (req, res) => {
         }
 
         const [result] = await db.query(
-            'INSERT INTO tasks (user_id, taskName) VALUES (?, ?)',
-            [userId, taskName.trim()]
+            'INSERT INTO tasks (user_id, taskName, isInProgress) VALUES (?, ?, ?)',
+            [userId, taskName.trim(), false]
         );
 
         const [newTask] = await db.query(
@@ -127,36 +131,30 @@ router.post('/assign-task', async (req, res) => {
 });
 
 
-router.delete('/task/:id', async (req, res) => {
+router.get('/tasks', async (req, res) => {
     try {
-        const id = parseInt(req.params.id);
-        
-        const [result] = await db.query(
-            'DELETE FROM tasks WHERE id = ?',
-            [id]
+        const [tasks] = await db.query(
+            `SELECT t.*, u.name as userName, u.email as userEmail 
+             FROM tasks t 
+             JOIN users u ON t.user_id = u.id 
+             ORDER BY t.id ASC`
         );
-        
-        if (result.affectedRows === 0) {
-            return res.status(404).json({
-                success: false,
-                message: 'Task not found'
-            });
-        }
-        
         res.json({
             success: true,
-            message: 'Task deleted successfully'
+            data: tasks,
+            count: tasks.length
         });
     } catch (error) {
-        console.error('Error deleting task:', error);
+        console.error('Error fetching all tasks:', error);
         res.status(500).json({
             success: false,
-            message: 'Failed to delete task',
+            message: 'Failed to fetch tasks',
             error: error.message
         });
     }
 });
-// ✅ Set In Progress
+
+
 router.patch('/task/:id/inprogress', async (req, res) => {
     try {
         const id = parseInt(req.params.id);
@@ -194,14 +192,45 @@ router.patch('/task/:id/inprogress', async (req, res) => {
     }
 });
 
+router.delete('/task/:id', async (req, res) => {
+    try {
+        const id = parseInt(req.params.id);
+        
+        const [result] = await db.query(
+            'DELETE FROM tasks WHERE id = ?',
+            [id]
+        );
+        
+        if (result.affectedRows === 0) {
+            return res.status(404).json({
+                success: false,
+                message: 'Task not found'
+            });
+        }
+        
+        res.json({
+            success: true,
+            message: 'Task deleted successfully'
+        });
+    } catch (error) {
+        console.error('Error deleting task:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to delete task',
+            error: error.message
+        });
+    }
+});
+
+
 router.patch('/task/:id/toggle', async (req, res) => {
     try {
         const id = parseInt(req.params.id);
         const { isCompleted } = req.body;
         
         const [result] = await db.query(
-            'UPDATE tasks SET isCompleted = ? WHERE id = ?',
-            [isCompleted, id]
+            'UPDATE tasks SET isCompleted = ?, isInProgress = ? WHERE id = ?',
+            [isCompleted, false, id]
         );
         
         if (result.affectedRows === 0) {
